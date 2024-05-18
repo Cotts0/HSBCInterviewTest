@@ -2,7 +2,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.*;
 
 /**
@@ -19,7 +18,7 @@ import java.util.concurrent.*;
 @Component
 public class RestApiDisplay {
 
-    public final ThreadPoolExecutor POOL = new ThreadPoolExecutor(4, 8,
+    public final ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(4, 8,
             60, TimeUnit.SECONDS,
             new LinkedBlockingDeque<>(16),
             Executors.defaultThreadFactory(),
@@ -29,7 +28,7 @@ public class RestApiDisplay {
     final static String postsUrl = "https://jsonplaceholder.typicode.com/posts";
 
 
-    public List<RequestTask> requestApi() {
+    private List<RequestTask> requestApi() {
         List<RequestTask> requestTasks = new ArrayList<>(2);
         RequestTask taskUsers = new RequestTask();
         taskUsers.setUrl(userUrl);
@@ -39,6 +38,24 @@ public class RestApiDisplay {
         taskPosts.setUrl(postsUrl);
         requestTasks.add(taskPosts);
         return requestTasks;
+    }
+
+    public void displayResult() throws InterruptedException {
+        List<RequestTask> requestTasks = requestApi();
+        int size = requestTasks.size();
+        CountDownLatch countDownLatch = new CountDownLatch(size);
+        requestTasks.forEach(t -> {
+            t.setLatch(countDownLatch);
+            Future<String> future = poolExecutor.submit(t);
+            try {
+                String result = future.get();
+                System.out.println("The result of url :" + t.getUrl() + " is --->");
+                System.out.println(result);
+            } catch (InterruptedException | ExecutionException e) {
+                System.out.println("Get result Error --->" + e.getMessage());
+            }
+        });
+        countDownLatch.await();
     }
 
 
